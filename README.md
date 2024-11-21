@@ -82,7 +82,7 @@ Including an example of how to use your role (for instance, with variables passe
   become: true
 
   roles:
-    - role: chrisvanmeer.certmonitor
+    - role: chrisvanmeer.certmonitor_vault
       certmonitor_vault_address: https://vault.domain.org:8200
       certmonitor_vault_auth_method: approle
 
