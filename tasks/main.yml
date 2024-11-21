@@ -213,10 +213,14 @@
 
 - name: CertMonitor Vault | Gather final certificates with corresponding data
   ansible.builtin.set_fact:
-    _final_certificates_list: >-
+    final_certificates_list: >-
       {{
-        _final_certificates_list
-        | default([]) + [{'item': item, 'certificate_data': item.secret[item.item.secret_key]}]
+        final_certificates_list | default([]) +
+        [{
+          'secrets_engine': item.item.secrets_engine_mount_point,
+          'secret_name': item.item.secret_name,
+          'certificate_data': item.secret[item.item.secret_key]
+        }]
       }}
   loop: "{{ filtered_certificates_verified }}"
   loop_control:
@@ -225,18 +229,14 @@
     - item.secret is defined
     - item.item.secret_key in item.secret
 
-- name: CertMonitor Vault | Filter and keep only certificate_data entries
-  ansible.builtin.set_fact:
-    final_certificates_list: "{{ _final_certificates_list | map(attribute='certificate_data') | list }}"
-
 - name: CertMonitor Vault | Check certificate validity
   community.crypto.x509_certificate_info:
-    content: "{{ item }}"
+    content: "{{ item.certificate_data }}"
     valid_at:
       check: "{{ certmonitor_vault_validity_check }}"
   loop: "{{ final_certificates_list }}"
   loop_control:
-    label: "certificate"
+    label: "{{ item.secrets_engine }}/{{ item.secret_name }}"
   register: cert_results
 
 - name: CertMonitor Vault | Filter out expiring certificates
@@ -245,14 +245,16 @@
 
 - name: CertMonitor Vault | Initialize an empty list for expiring certificates
   ansible.builtin.set_fact:
-    expiring_vault_certs: []
+    expiring_vault_certs_full: []
 
 - name: CertMonitor Vault | Create custom list of expiring certificates
   ansible.builtin.set_fact:
-    expiring_vault_certs: >-
+    expiring_vault_certs_full: >-
       {{
-        expiring_vault_certs
-        + [{
+        expiring_vault_certs_full +
+        [{
+            'secrets_engine': item.item.secrets_engine,
+            'secret_name': item.item.secret_name,
             'subject': item.subject.commonName,
             'san': item.subject_alt_name,
             'days_to_expiration': ((item.not_after | to_datetime('%Y%m%d%H%M%SZ'))
@@ -262,10 +264,6 @@
   loop: "{{ _expiring_vault_certs }}"
   loop_control:
     label: "{{ item.subject.commonName }}"
-
-- name: CertMonitor Vault | Filter out duplicates
-  ansible.builtin.set_fact:
-    expiring_vault_certs_full: "{{ expiring_vault_certs | unique(attribute='subject') }}"
 
 - name: CertMonitor Vault | Output expiring certificates
   ansible.builtin.debug:
