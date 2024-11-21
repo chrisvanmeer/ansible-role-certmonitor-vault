@@ -1,0 +1,28 @@
+---
+galaxy_info:
+  author: Chris van Meer
+  description: Certificate Monitoring - Hashicorp Vault
+  company: AT Computing
+  namespace: chrisvanmeer
+  role_name: certmonitor_vault
+
+  license: BSD
+
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: EL
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+
+  galaxy_tags:
+    - certificates
+    - tls
+    - monitoring
+    - hashicorp
+    - vault
+
+dependencies: []

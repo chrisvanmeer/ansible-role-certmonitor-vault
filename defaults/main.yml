@@ -1,0 +1,52 @@
+---
+# defaults file for ansible-role-certmonitor-vault
+
+# The address of the Vault server
+# ===============================
+certmonitor_vault_address: http://127.0.0.1:8200
+
+# If TLS, validate certificates, leave this on in production
+# ==========================================================
+certmonitor_vault_validate_certs: true
+
+# Supported: token, userpass and approle
+# =========================================
+certmonitor_vault_auth_method: approle
+
+# If other than the default auth method mount point
+# =================================================
+# certmonitor_vault_auth_method_mount_point: <custom path to auth method - optional>
+
+# Set token for token authentication
+# ==================================
+# certmonitor_vault_auth_token_token: <token>
+
+# Set username, password and auth method mount point for userpass
+# ===============================================================
+# certmonitor_vault_auth_userpass_username: <username>
+# certmonitor_vault_auth_userpass_password: <password>
+
+# Set role_id, secret_id and auth method mount point for approle
+# ==============================================================
+# certmonitor_vault_auth_approle_role_id: <role_id>
+# certmonitor_vault_auth_approle_secret_id: <secret_id>
+
+# Define this list with all the secrets you want retrieved
+# Supported secrets engines: kv1 and kv2
+# ========================================================
+# certmonitor_vault_list:
+#   - secrets_engine: (kv1|kv2) - required
+#     secrets_engine_mount_point: <name of the kv mount if not default - optional>
+#     secret_key: <key of the secret with the certificate> - required
+
+# The check of the certificates validity specified in weeks from now
+# By default we use "+2w" to report certificates that expire within
+# the next two weeks
+certmonitor_vault_validity_check: "+2w"
+
+# Default email reporting is disabled, set the following to true to enable
+# certmonitor_email_enabled: true
+certmonitor_vault_email_subject: "Expiring Vault TLS Certificates"
+
+# Set the output to HTML
+certmonitor_vault_email_subtype: "html"

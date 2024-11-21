@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ certmonitor_vault_email_subject }}</title>
+    <style>
+      table {
+          width: 100%;
+          border-collapse: collapse;
+          border: 2px solid #ccc;
+      }
+      th, td {
+          border: 1px solid #ccc;
+          padding: 8px;
+          text-align: left;
+      }
+      th {
+          background-color: #f2f2f2;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>{{ certmonitor_vault_email_subject }}</h1>
+      <table>
+        <thead>
+          <tr>
+            {% for key in expiring_certs_full[0].keys() %}
+              <th>{{ key | replace("_", " ") | title }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in expiring_certs_full %}
+            <tr>
+              {% for value in item.values() %}
+                <td>{{ value }}</td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

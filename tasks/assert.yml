@@ -1,0 +1,117 @@
+---
+# assert file for ansible-role-certmonitor-vault
+
+- name: assert | Test certmonitor_vault_address
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_address is defined
+      - certmonitor_vault_address is match('^https?://[a-zA-Z0-9.-]+:[0-9]+$')
+    quiet: true
+
+- name: assert | Test certmonitor_vault_vault_validate_certs
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_validate_certs is defined
+      - certmonitor_vault_validate_certs is boolean
+    quiet: true
+
+- name: assert | Test certmonitor_vault_auth_method
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_method is defined
+      - certmonitor_vault_auth_method is string
+      - certmonitor_vault_auth_method in ['token', 'userpass', 'approle']
+    quiet: true
+
+- name: assert | Test certmonitor_vault_auth_method_mount_point
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_method_mount_point is string
+      - certmonitor_vault_auth_method_mount_point is not none
+    quiet: true
+  when:
+    - certmonitor_vault_auth_method_mount_point is defined
+
+- name: assert | Test certmonitor_vault_auth_token_token
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_token_token is vault_encrypted
+      - certmonitor_vault_auth_token_token is not none
+    quiet: true
+  when:
+    - certmonitor_vault_auth_method == "token"
+
+- name: assert | Test certmonitor_vault_auth_userpass_username
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_userpass_username is string
+      - certmonitor_vault_auth_userpass_username is not none
+    quiet: true
+  when:
+    - certmonitor_vault_auth_method == "userpass"
+
+- name: assert | Test certmonitor_vault_auth_userpass_password
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_userpass_password is vault_encrypted
+      - certmonitor_vault_auth_userpass_password is not none
+    quiet: true
+  when:
+    - certmonitor_vault_auth_method == "userpass"
+
+- name: assert | Test certmonitor_vault_auth_approle_role_id
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_approle_role_id is string
+      - certmonitor_vault_auth_approle_role_id is not none
+    quiet: true
+  when:
+    - certmonitor_vault_auth_method == "approle"
+
+- name: assert | Test certmonitor_vault_auth_approle_secret_id
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_approle_secret_id is vault_encrypted
+      - certmonitor_vault_auth_approle_secret_id is not none
+    quiet: true
+  when:
+    - certmonitor_vault_auth_method == "approle"
+
+- name: assert | Test certmonitor_vault_list
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_list is iterable
+    quiet: true
+
+- name: assert | Test item.secrets_engine
+  ansible.builtin.assert:
+    that:
+      - item.secrets_engine is defined
+      - item.secrets_engine is string
+      - item.secrets_engine in ['kv1', 'kv2']
+    quiet: true
+  loop: "{{ certmonitor_vault_list }}"
+  loop_control:
+    label: "{{ item.secrets_engine }}"
+
+- name: assert | Test item.secrets_engine_mount_point
+  ansible.builtin.assert:
+    that:
+      - item.secrets_engine is defined
+      - item.secrets_engine is string
+    quiet: true
+  loop: "{{ certmonitor_vault_list }}"
+  loop_control:
+    label: "{{ item.secrets_engine_mount_point }}"
+  when:
+    - item.secrets_engine_mount_point is defined
+
+- name: assert | Test item.secret_key
+  ansible.builtin.assert:
+    that:
+      - item.secret_key is defined
+      - item.secret_key is string
+    quiet: true
+  loop: "{{ certmonitor_vault_list }}"
+  loop_control:
+    label: "{{ item.secret_key }}"
