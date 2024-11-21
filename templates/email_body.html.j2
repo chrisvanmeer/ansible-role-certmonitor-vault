@@ -26,13 +26,13 @@
       <table>
         <thead>
           <tr>
-            {% for key in expiring_certs_full[0].keys() %}
+            {% for key in expiring_vault_certs_full[0].keys() %}
               <th>{{ key | replace("_", " ") | title }}</th>
             {% endfor %}
           </tr>
         </thead>
         <tbody>
-          {% for item in expiring_certs_full %}
+          {% for item in expiring_vault_certs_full %}
             <tr>
               {% for value in item.values() %}
                 <td>{{ value }}</td>
