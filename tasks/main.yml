@@ -249,7 +249,6 @@
 
 - name: CertMonitor Vault | Create custom list of expiring certificates
   ansible.builtin.set_fact:
-    # yamllint disable-line rule:line-length
     expiring_vault_certs: >-
       {{
         expiring_vault_certs
@@ -264,9 +263,9 @@
   loop_control:
     label: "{{ item.subject.commonName }}"
 
-- name: CertMonitor Vault | Combine all expiring certificates into one list
+- name: CertMonitor Vault | Filter out duplicates
   ansible.builtin.set_fact:
-    expiring_vault_certs_full: "{{ hostvars | json_query('*.expiring_vault_certs[]') }}"
+    expiring_vault_certs_full: "{{ expiring_vault_certs | unique(attribute='subject') }}"
 
 - name: CertMonitor Vault | Output expiring certificates
   ansible.builtin.debug:
