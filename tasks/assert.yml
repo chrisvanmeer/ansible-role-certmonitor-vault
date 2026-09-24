@@ -45,7 +45,9 @@
       - certmonitor_vault_auth_token_token | length > 0
     quiet: true
     fail_msg: certmonitor_vault_auth_token_token must be a non-empty string
-  when: certmonitor_vault_auth_method == "token"
+  when:
+    - certmonitor_vault_auth_method == "token"
+    - not certmonitor_vault_require_encrypted_credentials | bool
 
 - name: assert | Test certmonitor_vault_auth_token_token is encrypted if enforced
   ansible.builtin.assert:
@@ -76,7 +78,9 @@
       - certmonitor_vault_auth_userpass_password | length > 0
     quiet: true
     fail_msg: certmonitor_vault_auth_userpass_password must be a non-empty string
-  when: certmonitor_vault_auth_method == "userpass"
+  when:
+    - certmonitor_vault_auth_method == "userpass"
+    - not certmonitor_vault_require_encrypted_credentials | bool
 
 - name: assert | Test certmonitor_vault_auth_userpass_password is encrypted if enforced
   ansible.builtin.assert:
@@ -107,7 +111,9 @@
       - certmonitor_vault_auth_approle_secret_id | length > 0
     quiet: true
     fail_msg: certmonitor_vault_auth_approle_secret_id must be a non-empty string
-  when: certmonitor_vault_auth_method == "approle"
+  when:
+    - certmonitor_vault_auth_method == "approle"
+    - not certmonitor_vault_require_encrypted_credentials | bool
 
 - name: assert | Test certmonitor_vault_auth_approle_secret_id is encrypted if enforced
   ansible.builtin.assert:

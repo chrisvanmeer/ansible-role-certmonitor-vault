@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- The plain-text credential asserts (`token`, `userpass` password and `approle`
+  secret ID) now only run when `certmonitor_vault_require_encrypted_credentials`
+  is disabled, instead of always running before the `vault_encrypted`
+  enforcement assert.
+
 ## [1.1.0] - 2026-09-24
 
 ### Changed
