@@ -1,0 +1,17 @@
+# Ansible
+*.retry
+*.tar.gz
+
+# Molecule
+.molecule/
+.ansible/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors / OS
+.idea/
+.DS_Store

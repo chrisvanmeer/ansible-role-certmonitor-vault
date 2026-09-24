@@ -7,6 +7,10 @@
 
 extends: default
 
+# GitHub Actions workflows use the YAML 1.1 boolean-ish key 'on'
+ignore: |
+  .github/workflows/*
+
 # Rules documentation: http://yamllint.readthedocs.io/en/latest/rules.html
 rules:
 
@@ -38,6 +42,14 @@ rules:
 
     # Disabling to allow for code comment blocks and #!/usr/bin/ansible-playbook
     require-starting-space: false
+    # Required by ansible-lint
+    min-spaces-from-content: 1
+
+  comments-indentation: false
+
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
 
   indentation:
     # Defaults

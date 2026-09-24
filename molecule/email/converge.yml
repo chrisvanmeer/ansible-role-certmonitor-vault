@@ -1,0 +1,69 @@
+---
+# Converge: starts a local SMTP capture server on the control node and runs the
+# role with e-mail reporting enabled. The e-mail must be sent from the control
+# node (delegate_to: localhost), not from the managed host.
+- name: Start SMTP capture server on the control node
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Check whether aiosmtpd is available on the control node
+      ansible.builtin.command: "{{ ansible_playbook_python }} -m pip show aiosmtpd"
+      register: _aiosmtpd_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install aiosmtpd on the control node
+      ansible.builtin.command: "{{ ansible_playbook_python }} -m pip install --quiet aiosmtpd"
+      when: _aiosmtpd_check.rc != 0
+      register: _aiosmtpd_install
+      changed_when: "'Successfully installed' in _aiosmtpd_install.stdout"
+
+    - name: Stop any previously started capture server
+      ansible.builtin.command: pkill -f aiosmtpd_logger.py
+      changed_when: false
+      failed_when: false
+
+    - name: Remove a previous mail capture log
+      ansible.builtin.file:
+        path: /tmp/aiosmtpd_mail.log
+        state: absent
+
+    - name: Start aiosmtpd and log received messages to a file
+      ansible.builtin.shell: >-
+        nohup {{ ansible_playbook_python }} {{ playbook_dir }}/files/aiosmtpd_logger.py
+        /tmp/aiosmtpd_mail.log > /tmp/aiosmtpd_server.log 2>&1 &
+      changed_when: false
+      # noqa command-instead-of-shell
+
+    - name: Wait for the SMTP capture server to listen
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 8025
+        timeout: 15
+      check_mode: false
+
+- name: Converge with e-mail reporting enabled
+  hosts: certmonitor
+  gather_facts: true
+  roles:
+    - role: certmonitor_vault
+      vars:
+        certmonitor_vault_address: http://vault:8200
+        certmonitor_vault_auth_method: token
+        certmonitor_vault_auth_token_token: root
+        certmonitor_vault_require_encrypted_credentials: false
+        certmonitor_vault_validity_check: "+2w"
+        certmonitor_vault_email_enabled: true
+        certmonitor_vault_email_subject: "Expiring Vault TLS Certificates"
+        certmonitor_vault_smtp_server: 127.0.0.1
+        certmonitor_vault_smtp_port: 8025
+        certmonitor_vault_smtp_secure: never
+        certmonitor_vault_email_sender: certmonitor@example.com
+        certmonitor_vault_email_recipient: ops@example.com
+        certmonitor_vault_list:
+          - secrets_engine: kv1
+            secrets_engine_mount_point: kv1
+            secret_key: certificate
+          - secrets_engine: kv2
+            secrets_engine_mount_point: kv2
+            secret_key: certificate

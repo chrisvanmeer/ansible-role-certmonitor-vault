@@ -1,0 +1,22 @@
+---
+# Converge: run the role against the managed host using token auth against the
+# Vault dev server and verify the certificate report (e-mail disabled).
+- name: Converge
+  hosts: certmonitor
+  gather_facts: true
+  roles:
+    - role: certmonitor_vault
+      vars:
+        certmonitor_vault_address: http://vault:8200
+        certmonitor_vault_auth_method: token
+        certmonitor_vault_auth_token_token: root
+        certmonitor_vault_require_encrypted_credentials: false
+        certmonitor_vault_validity_check: "+2w"
+        certmonitor_vault_email_enabled: false
+        certmonitor_vault_list:
+          - secrets_engine: kv1
+            secrets_engine_mount_point: kv1
+            secret_key: certificate
+          - secrets_engine: kv2
+            secrets_engine_mount_point: kv2
+            secret_key: certificate

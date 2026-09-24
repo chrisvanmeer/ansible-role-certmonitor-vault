@@ -1,0 +1,176 @@
+---
+# Prepare: install tooling on the managed host, then populate the Vault dev
+# server with a KV1 and a KV2 mount that hold expiring and valid certificates.
+- name: Prepare test environment
+  hosts: certmonitor
+  gather_facts: true
+  tasks:
+    - name: Install Python requirements on the managed host
+      ansible.builtin.command:
+        cmd: "{{ ansible_python_interpreter | default('/usr/local/bin/python3') }} -m pip install hvac 'requests>=2.29' 'cryptography>=3.3'"
+      register: _pip_install
+      changed_when: "'Requirement already satisfied' not in _pip_install.stdout"
+
+    - name: Wait for Vault to become reachable
+      ansible.builtin.uri:
+        url: http://vault:8200/v1/sys/health
+      register: vault_health
+      until: vault_health.status == 200
+      retries: 30
+      delay: 3
+      changed_when: false
+
+    - name: Enable KV1 (version 1) secrets engine
+      ansible.builtin.uri:
+        url: http://vault:8200/v1/sys/mounts/kv1
+        method: PUT
+        headers:
+          X-Vault-Token: root
+        body_format: json
+        body:
+          type: kv
+          options:
+            version: "1"
+        status_code: [200, 204]
+      changed_when: false
+
+    - name: Enable KV2 (version 2) secrets engine
+      ansible.builtin.uri:
+        url: http://vault:8200/v1/sys/mounts/kv2
+        method: PUT
+        headers:
+          X-Vault-Token: root
+        body_format: json
+        body:
+          type: kv
+          options:
+            version: "2"
+        status_code: [200, 204]
+      changed_when: false
+
+    - name: Create test certificate directory
+      ansible.builtin.file:
+        path: /tmp/certmonitor
+        state: directory
+        mode: "0700"
+
+    - name: Generate private keys for the test certificates
+      community.crypto.openssl_privatekey:
+        path: "{{ item }}"
+        size: 2048
+      loop:
+        - /tmp/certmonitor/expiring_kv1.key
+        - /tmp/certmonitor/expiring_kv2.key
+        - /tmp/certmonitor/valid_kv1.key
+        - /tmp/certmonitor/valid_kv2.key
+
+    - name: Generate CSRs for the test certificates
+      community.crypto.openssl_csr:
+        path: "{{ item.path }}"
+        privatekey_path: "{{ item.key }}"
+        common_name: "{{ item.cn }}"
+        subject_alt_name:
+          - "DNS:{{ item.cn }}"
+      loop:
+        - path: /tmp/certmonitor/expiring_kv1.csr
+          key: /tmp/certmonitor/expiring_kv1.key
+          cn: vault-expiring-kv1.example.com
+        - path: /tmp/certmonitor/expiring_kv2.csr
+          key: /tmp/certmonitor/expiring_kv2.key
+          cn: vault-expiring-kv2.example.com
+        - path: /tmp/certmonitor/valid_kv1.csr
+          key: /tmp/certmonitor/valid_kv1.key
+          cn: vault-valid-kv1.example.com
+        - path: /tmp/certmonitor/valid_kv2.csr
+          key: /tmp/certmonitor/valid_kv2.key
+          cn: vault-valid-kv2.example.com
+      loop_control:
+        label: "{{ item.cn }}"
+
+    - name: Generate the self-signed test certificates
+      community.crypto.x509_certificate:
+        path: "{{ item.path }}"
+        csr_path: "{{ item.csr }}"
+        privatekey_path: "{{ item.key }}"
+        provider: selfsigned
+        selfsigned_not_after: "{{ item.not_after }}"
+        selfsigned_not_before: "-7d"
+      loop:
+        - path: /tmp/certmonitor/expiring_kv1.crt
+          csr: /tmp/certmonitor/expiring_kv1.csr
+          key: /tmp/certmonitor/expiring_kv1.key
+          not_after: "+3d"
+        - path: /tmp/certmonitor/expiring_kv2.crt
+          csr: /tmp/certmonitor/expiring_kv2.csr
+          key: /tmp/certmonitor/expiring_kv2.key
+          not_after: "+3d"
+        - path: /tmp/certmonitor/valid_kv1.crt
+          csr: /tmp/certmonitor/valid_kv1.csr
+          key: /tmp/certmonitor/valid_kv1.key
+          not_after: "+365d"
+        - path: /tmp/certmonitor/valid_kv2.crt
+          csr: /tmp/certmonitor/valid_kv2.csr
+          key: /tmp/certmonitor/valid_kv2.key
+          not_after: "+365d"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Read generated certificates
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      loop:
+        - /tmp/certmonitor/expiring_kv1.crt
+        - /tmp/certmonitor/expiring_kv2.crt
+        - /tmp/certmonitor/valid_kv1.crt
+        - /tmp/certmonitor/valid_kv2.crt
+      register: _cert_files
+
+    - name: Store expiring certificate in KV1 mount
+      ansible.builtin.uri:
+        url: http://vault:8200/v1/kv1/webserver
+        method: POST
+        headers:
+          X-Vault-Token: root
+        body_format: json
+        body:
+          certificate: "{{ _cert_files.results[0].content | b64decode }}"
+        status_code: [200, 204]
+      changed_when: false
+
+    - name: Store valid certificate in KV1 mount
+      ansible.builtin.uri:
+        url: http://vault:8200/v1/kv1/webserver-valid
+        method: POST
+        headers:
+          X-Vault-Token: root
+        body_format: json
+        body:
+          certificate: "{{ _cert_files.results[2].content | b64decode }}"
+        status_code: [200, 204]
+      changed_when: false
+
+    - name: Store expiring certificate in KV2 mount
+      ansible.builtin.uri:
+        url: http://vault:8200/v1/kv2/data/webserver
+        method: POST
+        headers:
+          X-Vault-Token: root
+        body_format: json
+        body:
+          data:
+            certificate: "{{ _cert_files.results[1].content | b64decode }}"
+        status_code: [200, 204]
+      changed_when: false
+
+    - name: Store valid certificate in KV2 mount
+      ansible.builtin.uri:
+        url: http://vault:8200/v1/kv2/data/webserver-valid
+        method: POST
+        headers:
+          X-Vault-Token: root
+        body_format: json
+        body:
+          data:
+            certificate: "{{ _cert_files.results[3].content | b64decode }}"
+        status_code: [200, 204]
+      changed_when: false

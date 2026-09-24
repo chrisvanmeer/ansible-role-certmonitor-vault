@@ -1,14 +1,14 @@
 ---
 galaxy_info:
   author: Chris van Meer
-  description: Certificate Monitoring - Hashicorp Vault
+  description: Monitor TLS certificate expiration on a HashiCorp Vault KV store and optionally email an HTML report
   company: AT Computing
   namespace: chrisvanmeer
   role_name: certmonitor_vault
 
   license: BSD
 
-  min_ansible_version: "2.15"
+  min_ansible_version: "2.16"
 
   platforms:
     - name: EL
@@ -24,5 +24,6 @@ galaxy_info:
     - monitoring
     - hashicorp
     - vault
+    - security
 
 dependencies: []

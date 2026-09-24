@@ -1,21 +1,32 @@
 ---
 # tasks file for ansible-role-certmonitor-vault
 
-- name: Import assert.yml
-  ansible.builtin.import_tasks:
-    file: assert.yml
+- name: CertMonitor Vault | Import input validation
+  ansible.builtin.import_tasks: assert.yml
   when: certmonitor_vault_list is defined
 
-- name: Set facts
+- name: CertMonitor Vault | Reset facts and split secrets engines
   ansible.builtin.set_fact:
-    kv1_secrets_engines: "{{ certmonitor_vault_list
-      | selectattr('secrets_engine', 'equalto', 'kv1')
-      | list }}"
-    kv2_secrets_engines: "{{ certmonitor_vault_list
-      | selectattr('secrets_engine', 'equalto', 'kv2')
-      | list }}"
+    kv1_secrets_engines: >-
+      {{
+        certmonitor_vault_list | default([])
+          | selectattr('secrets_engine', 'equalto', 'kv1')
+          | list
+      }}
+    kv2_secrets_engines: >-
+      {{
+        certmonitor_vault_list | default([])
+          | selectattr('secrets_engine', 'equalto', 'kv2')
+          | list
+      }}
     kv1_secrets: []
     kv2_secrets: []
+    expanded_kv1_secrets: []
+    expanded_kv2_secrets: []
+    filtered_certificates: []
+    filtered_certificates_verified: []
+    final_certificates_list: []
+    expiring_vault_certs_full: []
 
 - name: CertMonitor Vault | List KV1 secrets
   community.hashi_vault.vault_list:
@@ -33,6 +44,7 @@
   loop_control:
     label: "{{ item.secrets_engine_mount_point }}"
   register: _kv1_secrets
+  when: kv1_secrets_engines | length > 0
 
 - name: CertMonitor Vault | List KV2 secrets
   community.hashi_vault.vault_list:
@@ -45,110 +57,95 @@
     secret_id: "{{ certmonitor_vault_auth_approle_secret_id | default(omit) }}"
     mount_point: "{{ certmonitor_vault_auth_method_mount_point | default(omit) }}"
     validate_certs: "{{ certmonitor_vault_validate_certs }}"
-    # For kv2, the path needs to follow the pattern 'mount_point/metadata' to list all secrets in that path
+    # For kv2, the metadata path lists all secrets in that mount
     path: "{{ item.secrets_engine_mount_point }}/metadata"
   loop: "{{ kv2_secrets_engines }}"
   loop_control:
     label: "{{ item.secrets_engine_mount_point }}"
   register: _kv2_secrets
+  when: kv2_secrets_engines | length > 0
 
-- name: CertMonitor Vault | Set KV1 fact
+- name: CertMonitor Vault | Set KV1 secrets per mount
   ansible.builtin.set_fact:
     kv1_secrets: >-
       {{
         kv1_secrets
-          | default([]) +
-            [combined_item
-              | dict2items
-              | rejectattr('key', 'equalto', 'secrets_engine')
-              | items2dict
-            ]
+          + [combined_item
+            | dict2items
+            | rejectattr('key', 'equalto', 'secrets_engine')
+            | items2dict
+          ]
       }}
   loop: >-
     {{
-      _kv1_secrets.results
+      _kv1_secrets.results | default([])
         | map(attribute='data')
         | map(attribute='data')
         | map(attribute='keys')
         | list
-        | zip(_kv1_secrets.results | map(attribute='item') | list)
+        | zip(_kv1_secrets.results | default([]) | map(attribute='item') | list)
     }}
   loop_control:
     label: "{{ item[0] }}"
   vars:
     combined_item: "{{ item[1] | combine({'_secrets': item[0]}) }}"
-  when:
-    - _kv1_secrets is defined
-    - _kv1_secrets | length > 0
 
-- name: CertMonitor Vault | Set KV2 fact
+- name: CertMonitor Vault | Set KV2 secrets per mount
   ansible.builtin.set_fact:
     kv2_secrets: >-
       {{
         kv2_secrets
-          | default([]) +
-            [combined_item
-              | dict2items
-              | rejectattr('key', 'equalto', 'secrets_engine')
-              | items2dict
-            ]
+          + [combined_item
+            | dict2items
+            | rejectattr('key', 'equalto', 'secrets_engine')
+            | items2dict
+          ]
       }}
   loop: >-
     {{
-      _kv2_secrets.results
+      _kv2_secrets.results | default([])
         | map(attribute='data')
         | map(attribute='data')
         | map(attribute='keys')
         | list
-        | zip(_kv2_secrets.results | map(attribute='item') | list)
+        | zip(_kv2_secrets.results | default([]) | map(attribute='item') | list)
     }}
   loop_control:
     label: "{{ item[0] }}"
   vars:
     combined_item: "{{ item[1] | combine({'_secrets': item[0]}) }}"
-  when:
-    - _kv2_secrets is defined
-    - _kv2_secrets | length > 0
 
 - name: CertMonitor Vault | Expand KV1 secrets
   ansible.builtin.set_fact:
     expanded_kv1_secrets: >-
       {{
         expanded_kv1_secrets
-        | default([]) +
-        [{
-          'secret_name': item.1,
-          'secret_key': item.0.secret_key,
-          'secrets_engine_mount_point': item.0.secrets_engine_mount_point
-        }]
+          + [{
+            'secret_name': item.1,
+            'secret_key': item.0.secret_key,
+            'secrets_engine_mount_point': item.0.secrets_engine_mount_point
+          }]
       }}
   loop: "{{ kv1_secrets | subelements('_secrets') }}"
   loop_control:
     label: "{{ item.1 }}"
-  when:
-    - kv1_secrets is defined
-    - kv1_secrets | length > 0
 
 - name: CertMonitor Vault | Expand KV2 secrets
   ansible.builtin.set_fact:
     expanded_kv2_secrets: >-
       {{
         expanded_kv2_secrets
-        | default([]) +
-        [{
-          'secret_name': item.1,
-          'secret_key': item.0.secret_key,
-          'secrets_engine_mount_point': item.0.secrets_engine_mount_point
-        }]
+          + [{
+            'secret_name': item.1,
+            'secret_key': item.0.secret_key,
+            'secrets_engine_mount_point': item.0.secrets_engine_mount_point
+          }]
       }}
   loop: "{{ kv2_secrets | subelements('_secrets') }}"
   loop_control:
     label: "{{ item.1 }}"
-  when:
-    - kv2_secrets is defined
-    - kv2_secrets | length > 0
 
-- name: CertMonitor Vault | Handle KV1 secrets
+- name: CertMonitor Vault | Fetch KV1 secrets
   community.hashi_vault.vault_kv1_get:
     url: "{{ certmonitor_vault_address }}"
     auth_method: "{{ certmonitor_vault_auth_method }}"
@@ -165,11 +162,9 @@
   loop_control:
     label: "{{ item.secrets_engine_mount_point }}/{{ item.secret_name }}"
   register: kv1_results
-  when:
-    - expanded_kv1_secrets is defined
-    - expanded_kv1_secrets | length > 0
+  when: expanded_kv1_secrets | length > 0
 
-- name: CertMonitor Vault | Handle KV2 secrets
+- name: CertMonitor Vault | Fetch KV2 secrets
   community.hashi_vault.vault_kv2_get:
     url: "{{ certmonitor_vault_address }}"
     auth_method: "{{ certmonitor_vault_auth_method }}"
@@ -186,24 +181,27 @@
   loop_control:
     label: "{{ item.secrets_engine_mount_point }}/{{ item.secret_name }}"
   register: kv2_results
-  when:
-    - expanded_kv2_secrets is defined
-    - expanded_kv2_secrets | length > 0
+  when: expanded_kv2_secrets | length > 0
 
 - name: CertMonitor Vault | Combine KV results
   ansible.builtin.set_fact:
-    certificates: "{{ kv1_results | combine(kv2_results, list_merge='append', recursive=true) }}"
+    certificates:
+      results: >-
+        {{
+          (kv1_results.results | default([]))
+          + (kv2_results.results | default([]))
+        }}
 
 - name: CertMonitor Vault | Convert certificates format
   ansible.builtin.set_fact:
-    filtered_certificates: "{{ filtered_certificates | default([]) + [item] }}"
+    filtered_certificates: "{{ filtered_certificates + [item] }}"
   loop: "{{ certificates.results }}"
   loop_control:
     label: "{{ item.item.secrets_engine_mount_point }}/{{ item.item.secret_name }}"
 
-- name: CertMonitor Vault | Filter certificates based on secret_key presence in data
+- name: CertMonitor Vault | Keep only secrets holding the configured key
   ansible.builtin.set_fact:
-    filtered_certificates_verified: "{{ filtered_certificates_verified | default([]) + [item] }}"
+    filtered_certificates_verified: "{{ filtered_certificates_verified + [item] }}"
   loop: "{{ filtered_certificates }}"
   loop_control:
     label: "{{ item.item.secrets_engine_mount_point }}/{{ item.item.secret_name }}"
@@ -211,16 +209,16 @@
     - item.secret is defined
     - item.item.secret_key in item.secret
 
-- name: CertMonitor Vault | Gather final certificates with corresponding data
+- name: CertMonitor Vault | Gather certificates with their data
   ansible.builtin.set_fact:
     final_certificates_list: >-
       {{
-        final_certificates_list | default([]) +
-        [{
-          'secrets_engine': item.item.secrets_engine_mount_point,
-          'secret_name': item.item.secret_name,
-          'certificate_data': item.secret[item.item.secret_key]
-        }]
+        final_certificates_list
+          + [{
+            'secrets_engine': item.item.secrets_engine_mount_point,
+            'secret_name': item.item.secret_name,
+            'certificate_data': item.secret[item.item.secret_key]
+          }]
       }}
   loop: "{{ filtered_certificates_verified }}"
   loop_control:
@@ -238,27 +236,29 @@
   loop_control:
     label: "{{ item.secrets_engine }}/{{ item.secret_name }}"
   register: cert_results
+  when: final_certificates_list | length > 0
 
 - name: CertMonitor Vault | Filter out expiring certificates
   ansible.builtin.set_fact:
-    _expiring_vault_certs: "{{ cert_results | json_query('results[? !(valid_at.check)]') }}"
+    _expiring_vault_certs: >-
+      {{
+        cert_results.results | default([])
+          | selectattr('valid_at.check', 'falsy')
+          | list
+      }}
 
-- name: CertMonitor Vault | Initialize an empty list for expiring certificates
-  ansible.builtin.set_fact:
-    expiring_vault_certs_full: []
-
-- name: CertMonitor Vault | Create custom list of expiring certificates
+- name: CertMonitor Vault | Build expiring certificates report
   ansible.builtin.set_fact:
     expiring_vault_certs_full: >-
       {{
-        expiring_vault_certs_full +
-        [{
+        expiring_vault_certs_full
+          + [{
             'secrets_engine': item.item.secrets_engine,
             'secret_name': item.item.secret_name,
             'subject': item.subject.commonName,
             'san': item.subject_alt_name,
             'days_to_expiration': ((item.not_after | to_datetime('%Y%m%d%H%M%SZ'))
-            - (ansible_date_time.iso8601 | to_datetime('%Y-%m-%dT%H:%M:%SZ'))).days
+              - (now(utc=true).strftime('%Y%m%d%H%M%SZ') | to_datetime('%Y%m%d%H%M%SZ'))).days
           }]
       }}
   loop: "{{ _expiring_vault_certs }}"
@@ -268,16 +268,17 @@
 - name: CertMonitor Vault | Output expiring certificates
   ansible.builtin.debug:
     var: expiring_vault_certs_full
-  run_once: true  # noqa run-once[task]
+  run_once: true
   when: expiring_vault_certs_full | length > 0
 
-- name: CertMonitor Vault | Email
+- name: CertMonitor Vault | Email expiring certificates from the control node
   community.general.mail:
     host: "{{ certmonitor_vault_smtp_server | default(omit) }}"
     port: "{{ certmonitor_vault_smtp_port | default(omit) }}"
     username: "{{ certmonitor_vault_smtp_username | default(omit) }}"
     password: "{{ certmonitor_vault_smtp_password | default(omit) }}"
     secure: "{{ certmonitor_vault_smtp_secure | default(omit) }}"
+    timeout: "{{ certmonitor_vault_smtp_timeout | default(omit) }}"
     to: "{{ certmonitor_vault_email_recipient | default(omit) }}"
     cc: "{{ certmonitor_vault_email_recipient_cc | default(omit) }}"
     bcc: "{{ certmonitor_vault_email_recipient_bcc | default(omit) }}"
@@ -286,7 +287,18 @@
     body: "{{ lookup('template', 'email_body.html.j2') }}"
     subtype: "{{ certmonitor_vault_email_subtype }}"
     headers: "{{ certmonitor_vault_email_headers | default(omit) }}"
-  run_once: true  # noqa run-once[task]
+  delegate_to: localhost
+  become: false
+  no_log: true
+  run_once: true
+  vars:
+    # The e-mail runs on the control node, so resolve the report facts of the
+    # managed host that produced them instead of the localhost facts.
+    expiring_vault_certs_full: >-
+      {{
+        hostvars[inventory_hostname]['expiring_vault_certs_full']
+          | default([])
+      }}
   when:
     - certmonitor_vault_email_enabled | default(false)
-    - expiring_vault_certs_full | length > 0
+    - hostvars[inventory_hostname]['expiring_vault_certs_full'] | default([]) | length > 0

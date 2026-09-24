@@ -1,19 +1,24 @@
 ---
-# assert file for ansible-role-certmonitor-vault
+# input validation for ansible-role-certmonitor-vault
 
 - name: assert | Test certmonitor_vault_address
   ansible.builtin.assert:
     that:
       - certmonitor_vault_address is defined
-      - certmonitor_vault_address is match('^https?://[a-zA-Z0-9.-]+:[0-9]+$')
+      - certmonitor_vault_address is match('^https?://[a-zA-Z0-9.-]+(:[0-9]{1,5})?$')
+      - certmonitor_vault_address | length > 0
     quiet: true
+    fail_msg: >-
+      certmonitor_vault_address must be a valid http(s) URL including a
+      hostname, with an optional port, e.g. https://vault.example.com:8200
 
-- name: assert | Test certmonitor_vault_vault_validate_certs
+- name: assert | Test certmonitor_vault_validate_certs
   ansible.builtin.assert:
     that:
       - certmonitor_vault_validate_certs is defined
       - certmonitor_vault_validate_certs is boolean
     quiet: true
+    fail_msg: certmonitor_vault_validate_certs must be set to a boolean
 
 - name: assert | Test certmonitor_vault_auth_method
   ansible.builtin.assert:
@@ -22,66 +27,107 @@
       - certmonitor_vault_auth_method is string
       - certmonitor_vault_auth_method in ['token', 'userpass', 'approle']
     quiet: true
+    fail_msg: certmonitor_vault_auth_method must be one of 'token', 'userpass' or 'approle'
 
 - name: assert | Test certmonitor_vault_auth_method_mount_point
   ansible.builtin.assert:
     that:
       - certmonitor_vault_auth_method_mount_point is string
-      - certmonitor_vault_auth_method_mount_point is not none
+      - certmonitor_vault_auth_method_mount_point | length > 0
     quiet: true
-  when:
-    - certmonitor_vault_auth_method_mount_point is defined
+    fail_msg: certmonitor_vault_auth_method_mount_point must be a non-empty string
+  when: certmonitor_vault_auth_method_mount_point is defined
 
 - name: assert | Test certmonitor_vault_auth_token_token
   ansible.builtin.assert:
     that:
-      - certmonitor_vault_auth_token_token is vault_encrypted
-      - certmonitor_vault_auth_token_token is not none
+      - certmonitor_vault_auth_token_token is string
+      - certmonitor_vault_auth_token_token | length > 0
     quiet: true
+    fail_msg: certmonitor_vault_auth_token_token must be a non-empty string
+  when: certmonitor_vault_auth_method == "token"
+
+- name: assert | Test certmonitor_vault_auth_token_token is encrypted if enforced
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_token_token is vault_encrypted
+    quiet: true
+    fail_msg: >-
+      certmonitor_vault_auth_token_token must be a Vault encrypted string.
+      Set certmonitor_vault_require_encrypted_credentials to false to accept
+      plain text credentials.
   when:
     - certmonitor_vault_auth_method == "token"
+    - certmonitor_vault_require_encrypted_credentials | bool
 
 - name: assert | Test certmonitor_vault_auth_userpass_username
   ansible.builtin.assert:
     that:
       - certmonitor_vault_auth_userpass_username is string
-      - certmonitor_vault_auth_userpass_username is not none
+      - certmonitor_vault_auth_userpass_username | length > 0
     quiet: true
-  when:
-    - certmonitor_vault_auth_method == "userpass"
+    fail_msg: certmonitor_vault_auth_userpass_username must be a non-empty string
+  when: certmonitor_vault_auth_method == "userpass"
 
 - name: assert | Test certmonitor_vault_auth_userpass_password
   ansible.builtin.assert:
     that:
-      - certmonitor_vault_auth_userpass_password is vault_encrypted
-      - certmonitor_vault_auth_userpass_password is not none
+      - certmonitor_vault_auth_userpass_password is string
+      - certmonitor_vault_auth_userpass_password | length > 0
     quiet: true
+    fail_msg: certmonitor_vault_auth_userpass_password must be a non-empty string
+  when: certmonitor_vault_auth_method == "userpass"
+
+- name: assert | Test certmonitor_vault_auth_userpass_password is encrypted if enforced
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_userpass_password is vault_encrypted
+    quiet: true
+    fail_msg: >-
+      certmonitor_vault_auth_userpass_password must be a Vault encrypted string.
+      Set certmonitor_vault_require_encrypted_credentials to false to accept
+      plain text credentials.
   when:
     - certmonitor_vault_auth_method == "userpass"
+    - certmonitor_vault_require_encrypted_credentials | bool
 
 - name: assert | Test certmonitor_vault_auth_approle_role_id
   ansible.builtin.assert:
     that:
       - certmonitor_vault_auth_approle_role_id is string
-      - certmonitor_vault_auth_approle_role_id is not none
+      - certmonitor_vault_auth_approle_role_id | length > 0
     quiet: true
-  when:
-    - certmonitor_vault_auth_method == "approle"
+    fail_msg: certmonitor_vault_auth_approle_role_id must be a non-empty string
+  when: certmonitor_vault_auth_method == "approle"
 
 - name: assert | Test certmonitor_vault_auth_approle_secret_id
   ansible.builtin.assert:
     that:
-      - certmonitor_vault_auth_approle_secret_id is vault_encrypted
-      - certmonitor_vault_auth_approle_secret_id is not none
+      - certmonitor_vault_auth_approle_secret_id is string
+      - certmonitor_vault_auth_approle_secret_id | length > 0
     quiet: true
+    fail_msg: certmonitor_vault_auth_approle_secret_id must be a non-empty string
+  when: certmonitor_vault_auth_method == "approle"
+
+- name: assert | Test certmonitor_vault_auth_approle_secret_id is encrypted if enforced
+  ansible.builtin.assert:
+    that:
+      - certmonitor_vault_auth_approle_secret_id is vault_encrypted
+    quiet: true
+    fail_msg: >-
+      certmonitor_vault_auth_approle_secret_id must be a Vault encrypted string.
+      Set certmonitor_vault_require_encrypted_credentials to false to accept
+      plain text credentials.
   when:
     - certmonitor_vault_auth_method == "approle"
+    - certmonitor_vault_require_encrypted_credentials | bool
 
 - name: assert | Test certmonitor_vault_list
   ansible.builtin.assert:
     that:
       - certmonitor_vault_list is iterable
     quiet: true
+    fail_msg: certmonitor_vault_list must be a list
 
 - name: assert | Test item.secrets_engine
   ansible.builtin.assert:
@@ -90,28 +136,31 @@
       - item.secrets_engine is string
       - item.secrets_engine in ['kv1', 'kv2']
     quiet: true
+    fail_msg: item.secrets_engine must be either 'kv1' or 'kv2'
   loop: "{{ certmonitor_vault_list }}"
   loop_control:
-    label: "{{ item.secrets_engine }}"
+    label: "{{ certmonitor_vault_list.index(item) }}"
 
 - name: assert | Test item.secrets_engine_mount_point
   ansible.builtin.assert:
     that:
-      - item.secrets_engine is defined
-      - item.secrets_engine is string
+      - item.secrets_engine_mount_point is string
+      - item.secrets_engine_mount_point | length > 0
     quiet: true
+    fail_msg: item.secrets_engine_mount_point must be a non-empty string when defined
   loop: "{{ certmonitor_vault_list }}"
   loop_control:
-    label: "{{ item.secrets_engine_mount_point }}"
-  when:
-    - item.secrets_engine_mount_point is defined
+    label: "{{ certmonitor_vault_list.index(item) }}"
+  when: item.secrets_engine_mount_point is defined
 
 - name: assert | Test item.secret_key
   ansible.builtin.assert:
     that:
       - item.secret_key is defined
       - item.secret_key is string
+      - item.secret_key | length > 0
     quiet: true
+    fail_msg: item.secret_key must be a non-empty string
   loop: "{{ certmonitor_vault_list }}"
   loop_control:
-    label: "{{ item.secret_key }}"
+    label: "{{ certmonitor_vault_list.index(item) }}"

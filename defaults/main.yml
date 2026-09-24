@@ -1,52 +1,73 @@
 ---
 # defaults file for ansible-role-certmonitor-vault
 
-# The address of the Vault server
-# ===============================
+# The address of the Vault server, e.g. https://vault.example.com:8200
 certmonitor_vault_address: http://127.0.0.1:8200
 
-# If TLS, validate certificates, leave this on in production
-# ==========================================================
+# When using TLS, validate the server certificate. Keep this enabled in production.
 certmonitor_vault_validate_certs: true
 
-# Supported: token, userpass and approle
-# =========================================
+# Supported auth methods: token, userpass and approle
 certmonitor_vault_auth_method: approle
 
-# If other than the default auth method mount point
-# =================================================
-# certmonitor_vault_auth_method_mount_point: <custom path to auth method - optional>
+# Mount point of the auth method if it differs from the default
+# certmonitor_vault_auth_method_mount_point: <custom mount point - optional>
 
-# Set token for token authentication
-# ==================================
-# certmonitor_vault_auth_token_token: <token>
+# Token authentication
+# certmonitor_vault_auth_token_token: <token - required if auth_method is 'token'>
 
-# Set username, password and auth method mount point for userpass
-# ===============================================================
-# certmonitor_vault_auth_userpass_username: <username>
-# certmonitor_vault_auth_userpass_password: <password>
+# Userpass authentication
+# certmonitor_vault_auth_userpass_username: <username - required if auth_method is 'userpass'>
+# certmonitor_vault_auth_userpass_password: <password - required if auth_method is 'userpass'>
 
-# Set role_id, secret_id and auth method mount point for approle
-# ==============================================================
-# certmonitor_vault_auth_approle_role_id: <role_id>
-# certmonitor_vault_auth_approle_secret_id: <secret_id>
+# AppRole authentication
+# certmonitor_vault_auth_approle_role_id: <role_id - required if auth_method is 'approle'>
+# certmonitor_vault_auth_approle_secret_id: <secret_id - required if auth_method is 'approle'>
 
-# Define this list with all the secrets you want retrieved
+# Require credentials (token, password, secret_id) to be Vault encrypted strings.
+# When false, plain text credentials are accepted; useful for CI/CD and testing
+# where credentials are injected through environment variables or ansible-vault.
+certmonitor_vault_require_encrypted_credentials: true
+
+# Define this list with all the Vault mounts and secret keys you want monitored.
 # Supported secrets engines: kv1 and kv2
-# ========================================================
 # certmonitor_vault_list:
 #   - secrets_engine: (kv1|kv2) - required
 #     secrets_engine_mount_point: <name of the kv mount if not default - optional>
-#     secret_key: <key of the secret with the certificate> - required
+#     secret_key: <key of the secret holding the certificate> - required
 
-# The check of the certificates validity specified in weeks from now
-# By default we use "+2w" to report certificates that expire within
-# the next two weeks
+# Validity window for the certificate check, defaults to "+2w" to report
+# certificates expiring within the next two weeks. Supports the same relative
+# notation as the community.crypto.x509_certificate_info module
+# (e.g. "+7d", "+4w", "+3m").
 certmonitor_vault_validity_check: "+2w"
 
-# Default email reporting is disabled, set the following to true to enable
-# certmonitor_email_enabled: true
+# E-mail reporting is disabled by default; set to true to enable it.
+# The e-mail is always sent from the Ansible control node (delegate_to: localhost),
+# as the managed hosts normally have no access to the SMTP relay.
+certmonitor_vault_email_enabled: false
+
+# Subject of the report e-mail, also used as the HTML title.
 certmonitor_vault_email_subject: "Expiring Vault TLS Certificates"
 
-# Set the output to HTML
+# MIME subtype of the report e-mail: html or plain.
 certmonitor_vault_email_subtype: "html"
+
+# SMTP options (used when certmonitor_vault_email_enabled is true).
+# An SMTP relay is expected to be reachable from the Ansible control node.
+# certmonitor_vault_smtp_server: mail.example.com
+# certmonitor_vault_smtp_port: 25
+# certmonitor_vault_smtp_username: <smtp username - optional>
+# certmonitor_vault_smtp_password: <smtp password - optional>
+# certmonitor_vault_smtp_secure: try            # never | always | starttls | try
+# certmonitor_vault_smtp_timeout: 30
+
+# Recipients of the report e-mail.
+# certmonitor_vault_email_sender: certmonitor@example.com
+# certmonitor_vault_email_recipient: ops@example.com
+# certmonitor_vault_email_recipient_cc: manager@example.com
+# certmonitor_vault_email_recipient_bcc: backup@example.com
+
+# Additional e-mail headers, as a dict (optional).
+# certmonitor_vault_email_headers:
+#   Reply-To: security@example.com

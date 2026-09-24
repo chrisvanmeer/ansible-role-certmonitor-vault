@@ -1,0 +1,11 @@
+---
+# Collections required by the Molecule scenarios (same as the repo root requirements)
+collections:
+  - name: community.hashi_vault
+    version: ">=5.0.0"
+  - name: community.crypto
+    version: ">=2.0.0"
+  - name: community.general
+    version: ">=7.0.0"
+  - name: community.docker
+    version: ">=3.0.0"

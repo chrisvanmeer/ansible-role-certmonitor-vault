@@ -1,0 +1,25 @@
+---
+# Verify: assert that the report e-mail was sent from the control node and
+# captured by the local SMTP capture server with the expected content.
+- name: Verify e-mail was sent from the control node
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Read the captured e-mail
+      ansible.builtin.slurp:
+        src: /tmp/aiosmtpd_mail.log
+      register: captured_mail
+
+    - name: Decode the captured e-mail for assertions
+      ansible.builtin.set_fact:
+        mail_text: "{{ captured_mail.content | b64decode }}"
+        mail_text_lower: "{{ captured_mail.content | b64decode | lower }}"
+
+    - name: Assert the captured e-mail contains the expected report
+      ansible.builtin.assert:
+        that:
+          - "'subject: =?utf-8?q?expiring_vault_tls_certificates?=' in mail_text_lower"
+          - "'to: ops@example.com' in mail_text_lower"
+          - "'<html' in mail_text"
+          - "'vault-expiring-kv1.example.com' in mail_text"
+          - "'vault-expiring-kv2.example.com' in mail_text"

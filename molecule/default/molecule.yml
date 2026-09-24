@@ -1,0 +1,48 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: vault
+    image: hashicorp/vault:1.19
+    command: server -dev
+    capabilities:
+      - IPC_LOCK
+    env:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    pre_build_image: true
+    docker_networks:
+      - name: molecule-net
+    networks:
+      - name: molecule-net
+  - name: certmonitor
+    image: python:3.12-slim
+    command: /bin/sleep infinity
+    pre_build_image: true
+    docker_networks:
+      - name: molecule-net
+    networks:
+      - name: molecule-net
+provisioner:
+  name: ansible
+  options:
+    v: true
+  playbooks:
+    prepare: prepare.yml
+    converge: converge.yml
+    verify: verify.yml
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy
+verifier:
+  name: ansible
+role_name_check: 1

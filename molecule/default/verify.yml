@@ -1,0 +1,51 @@
+---
+# Verify: run the role again so the report facts are available in this
+# playbook run, then assert that the report contains exactly the two expiring
+# certificates (one from the KV1 mount, one from the KV2 mount) and none of
+# the valid ones.
+- name: Verify
+  hosts: certmonitor
+  gather_facts: true
+  tasks:
+    - name: Include certmonitor_vault role to populate the report facts
+      ansible.builtin.include_role:
+        name: certmonitor_vault
+      vars:
+        certmonitor_vault_address: http://vault:8200
+        certmonitor_vault_auth_method: token
+        certmonitor_vault_auth_token_token: root
+        certmonitor_vault_require_encrypted_credentials: false
+        certmonitor_vault_validity_check: "+2w"
+        certmonitor_vault_email_enabled: false
+        certmonitor_vault_list:
+          - secrets_engine: kv1
+            secrets_engine_mount_point: kv1
+            secret_key: certificate
+          - secrets_engine: kv2
+            secrets_engine_mount_point: kv2
+            secret_key: certificate
+
+    - name: Assert report contains only the expiring certificates
+      ansible.builtin.assert:
+        that:
+          - expiring_vault_certs_full | length == 2
+          - expiring_vault_certs_full | map(attribute='secrets_engine') | sort == ['kv1', 'kv2']
+          - >-
+            expiring_vault_certs_full
+            | selectattr('subject', 'equalto', 'vault-expiring-kv1.example.com')
+            | list | length == 1
+          - >-
+            expiring_vault_certs_full
+            | selectattr('subject', 'equalto', 'vault-expiring-kv2.example.com')
+            | list | length == 1
+          - >-
+            expiring_vault_certs_full
+            | selectattr('subject', 'search', 'vault-valid')
+            | list | length == 0
+          - >-
+            expiring_vault_certs_full
+            | rejectattr('days_to_expiration', 'gt', 7)
+            | list | length == 2
+          - >-
+            expiring_vault_certs_full
+            | map(attribute='days_to_expiration') | min >= 0

@@ -1,0 +1,175 @@
+---
+# Role argument specification (ansible-doc). Note that assertions that require
+# custom tests (e.g. `is vault_encrypted`) are enforced in tasks/assert.yml.
+argument_specs:
+  main:
+    short_description: Monitor TLS certificate expiration on a HashiCorp Vault KV store and optionally email an HTML report
+    description: >-
+      Reads certificates stored in HashiCorp Vault KV version 1 and version 2
+      mounts, checks their validity against the configured window and optionally
+      emails an HTML report of the expiring certificates. The report is always
+      sent from the Ansible control node, so no egress to an SMTP relay is
+      required from the managed hosts.
+    options:
+      certmonitor_vault_address:
+        type: str
+        required: false
+        default: http://127.0.0.1:8200
+        description: Address of the Vault server, e.g. https://vault.example.com:8200.
+
+      certmonitor_vault_validate_certs:
+        type: bool
+        required: false
+        default: true
+        description: When using TLS, validate the server certificate. Keep enabled in production.
+
+      certmonitor_vault_auth_method:
+        type: str
+        required: false
+        default: approle
+        choices: [token, userpass, approle]
+        description: Authentication method used to talk to the Vault API.
+
+      certmonitor_vault_auth_method_mount_point:
+        type: str
+        required: false
+        description: Mount point of the auth method if it differs from the default.
+
+      certmonitor_vault_auth_token_token:
+        type: str
+        required: false
+        description: Token for 'token' authentication. Must be a Vault encrypted string unless certmonitor_vault_require_encrypted_credentials is false.
+
+      certmonitor_vault_auth_userpass_username:
+        type: str
+        required: false
+        description: Username for 'userpass' authentication.
+
+      certmonitor_vault_auth_userpass_password:
+        type: str
+        required: false
+        description: Password for 'userpass' authentication. Must be a Vault encrypted string unless certmonitor_vault_require_encrypted_credentials is false.
+
+      certmonitor_vault_auth_approle_role_id:
+        type: str
+        required: false
+        description: Role ID for 'approle' authentication.
+
+      certmonitor_vault_auth_approle_secret_id:
+        type: str
+        required: false
+        description: Secret ID for 'approle' authentication. Must be a Vault encrypted string unless certmonitor_vault_require_encrypted_credentials is false.
+
+      certmonitor_vault_require_encrypted_credentials:
+        type: bool
+        required: false
+        default: true
+        description: >-
+          When true, credentials (token, userpass password, approle secret ID)
+          must be Vault encrypted strings. Disable to accept plain text
+          credentials, e.g. when injecting them from CI/CD variables.
+
+      certmonitor_vault_list:
+        type: list
+        required: false
+        description: >-
+          List of Vault mounts and secret key names to monitor. Each entry
+          selects one secrets engine, the mount point and the key holding the
+          certificate in PEM format.
+        options:
+          secrets_engine:
+            type: str
+            required: true
+            choices: [kv1, kv2]
+            description: Secrets engine version of the mount.
+          secrets_engine_mount_point:
+            type: str
+            required: false
+            description: Name of the KV mount if it is not the default one.
+          secret_key:
+            type: str
+            required: true
+            description: Key of the secret that holds the certificate.
+
+      certmonitor_vault_validity_check:
+        type: str
+        required: false
+        default: "+2w"
+        description: >-
+          Validity window for the certificate check using the relative notation
+          of community.crypto.x509_certificate_info, e.g. "+7d", "+2w", "+3m".
+
+      certmonitor_vault_email_enabled:
+        type: bool
+        required: false
+        default: false
+        description: Enable the e-mail report. Sent from the Ansible control node.
+
+      certmonitor_vault_email_subject:
+        type: str
+        required: false
+        default: "Expiring Vault TLS Certificates"
+        description: Subject of the report e-mail, also used as the HTML title.
+
+      certmonitor_vault_email_subtype:
+        type: str
+        required: false
+        default: html
+        choices: [html, plain]
+        description: MIME subtype of the report e-mail.
+
+      certmonitor_vault_smtp_server:
+        type: str
+        required: false
+        description: SMTP server reachable from the Ansible control node.
+
+      certmonitor_vault_smtp_port:
+        type: int
+        required: false
+        description: SMTP port.
+
+      certmonitor_vault_smtp_username:
+        type: str
+        required: false
+        description: SMTP username.
+
+      certmonitor_vault_smtp_password:
+        type: str
+        required: false
+        description: SMTP password.
+
+      certmonitor_vault_smtp_secure:
+        type: str
+        required: false
+        choices: [never, always, starttls, try]
+        description: SMTP TLS mode.
+
+      certmonitor_vault_smtp_timeout:
+        type: int
+        required: false
+        description: SMTP timeout in seconds.
+
+      certmonitor_vault_email_sender:
+        type: str
+        required: false
+        description: Sender address of the report e-mail.
+
+      certmonitor_vault_email_recipient:
+        type: str
+        required: false
+        description: Recipient(s) of the report e-mail.
+
+      certmonitor_vault_email_recipient_cc:
+        type: str
+        required: false
+        description: CC recipient(s) of the report e-mail.
+
+      certmonitor_vault_email_recipient_bcc:
+        type: str
+        required: false
+        description: BCC recipient(s) of the report e-mail.
+
+      certmonitor_vault_email_headers:
+        type: dict
+        required: false
+        description: Additional e-mail headers.
